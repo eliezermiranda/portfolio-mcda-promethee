@@ -1,16 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-Planejamento Estratégico Empresarial — Seleção de Portfólio de Projetos com MCDA (PROMETHEE II + V)
+Do Plano à Carteira — Seleção de Portfólio de Projetos com MCDA (PROMETHEE II + V)
 App Streamlit para apoiar a decisão de portfólio de investimentos alinhada
 ao planejamento estratégico empresarial.
 
-Como funciona:
+Versão 2 — implementa os SEIS tipos de funções de preferência generalizadas
+de Brans, Vincke e Mareschal (1986):
+  Tipo 1 — usual        : P = 1 se d > 0                        (sem parâmetros)
+  Tipo 2 — u-shape      : P = 1 se d > q                        (parâmetro q)
+  Tipo 3 — v-shape      : P = d/p em (0, p], 1 acima            (parâmetro p)
+  Tipo 4 — level        : P = 1/2 em (q, p], 1 acima            (parâmetros q, p)
+  Tipo 5 — linear       : P = (d-q)/(p-q) em (q, p], 1 acima    (parâmetros q, p)
+                          (v-shape com indiferença)
+  Tipo 6 — gaussiana    : P = 1 - exp(-d²/(2s²)) se d > 0       (parâmetro s)
+
+Como funciona o app:
 1) PROMETHEE II ordena os projetos (fluxo líquido de preferência, phi)
 2) PROMETHEE V seleciona a carteira que maximiza o phi total sob restrição
    de orçamento (problema da mochila 0-1), respeitando projetos obrigatórios.
 """
 
 import io
+import math
 from itertools import combinations
 
 import numpy as np
@@ -21,10 +32,21 @@ import streamlit as st
 # Configuração da página
 # ----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Planejamento Estratégico Empresarial — Decisão de Portfólio de Projetos de Investimento com MCDA PROMETHEE V",
+    page_title="Do Plano à Carteira — MCDA PROMETHEE V",
     page_icon="📊",
     layout="wide",
 )
+
+FUNCOES_VALIDAS = ["usual", "u-shape", "v-shape", "level", "linear", "gaussiana"]
+
+DESCRICAO_FUNCOES = {
+    "usual":     "Tipo 1 — Usual: qualquer diferença positiva gera preferência total (P = 1). Sem parâmetros. Indicada para escalas discretas (ex.: notas 1–5) em que qualquer diferença conta.",
+    "u-shape":   "Tipo 2 — U-shape (quase-critério): diferenças até q são indiferentes (P = 0); acima de q, preferência total (P = 1). Parâmetro: q.",
+    "v-shape":   "Tipo 3 — V-shape: a preferência cresce linearmente de 0 até p (P = d/p) e é total acima de p. Parâmetro: p. Sem faixa de indiferença.",
+    "level":     "Tipo 4 — Level (patamar): P = 0 até q; P = 1/2 entre q e p; P = 1 acima de p. Parâmetros: q e p. Útil para julgamentos em degraus (indiferente / preferência fraca / preferência forte).",
+    "linear":    "Tipo 5 — Linear (V-shape com indiferença): P = 0 até q; cresce linearmente (P = (d−q)/(p−q)) entre q e p; P = 1 acima de p. Parâmetros: q e p. A mais usada para critérios contínuos (ex.: VPL).",
+    "gaussiana": "Tipo 6 — Gaussiana: P = 1 − exp(−d²/2s²) para d > 0 — crescimento suave, sem descontinuidades. Parâmetro: s (ponto de inflexão, informado na coluna s_gaussiana).",
+}
 
 # ----------------------------------------------------------------------------
 # Dados de exemplo (usados se o usuário não subir planilha)
@@ -38,6 +60,7 @@ def dados_exemplo():
         "FuncaoPreferencia": ["linear", "linear", "usual", "linear"],
         "q_indiferenca": [50.0, 0.0, 0.0, 0.0],
         "p_preferencia": [500.0, 2.0, 0.0, 2.0],
+        "s_gaussiana": [0.0, 0.0, 0.0, 0.0],
     })
     projetos = pd.DataFrame({
         "Projeto": ["ERP Cloud", "Nova Linha de Produção", "Expansão Nordeste",
@@ -54,47 +77,102 @@ def dados_exemplo():
 
 
 # ----------------------------------------------------------------------------
-# Núcleo PROMETHEE
+# Núcleo PROMETHEE — as seis funções de preferência generalizadas
+# (Brans, Vincke & Mareschal, 1986)
 # ----------------------------------------------------------------------------
-def funcao_preferencia(d, tipo, q, p):
-    """Grau de preferência P(d) para uma diferença de desempenho d >= 0."""
+def normalizar_tipo(tipo):
+    """Aceita sinônimos/variações de escrita e devolve o nome canônico."""
+    t = str(tipo).strip().lower().replace("_", "-").replace(" ", "-")
+    mapa = {
+        "usual": "usual", "tipo1": "usual", "type1": "usual", "1": "usual",
+        "u-shape": "u-shape", "ushape": "u-shape", "quase-criterio": "u-shape",
+        "quase-critério": "u-shape", "tipo2": "u-shape", "type2": "u-shape", "2": "u-shape",
+        "v-shape": "v-shape", "vshape": "v-shape", "linear-simples": "v-shape",
+        "tipo3": "v-shape", "type3": "v-shape", "3": "v-shape",
+        "level": "level", "patamar": "level", "niveis": "level", "níveis": "level",
+        "tipo4": "level", "type4": "level", "4": "level",
+        "linear": "linear", "v-shape-indiferenca": "linear", "v-shape-indiferença": "linear",
+        "linear-com-indiferenca": "linear", "tipo5": "linear", "type5": "linear", "5": "linear",
+        "gaussiana": "gaussiana", "gaussian": "gaussiana", "gauss": "gaussiana",
+        "tipo6": "gaussiana", "type6": "gaussiana", "6": "gaussiana",
+    }
+    return mapa.get(t, "usual")
+
+
+def funcao_preferencia(d, tipo, q=0.0, p=0.0, s=0.0):
+    """
+    Grau de preferência P(d) para uma diferença de desempenho d.
+    Implementa os 6 critérios generalizados de Brans, Vincke & Mareschal (1986).
+    Parâmetros ausentes/zerados degradam graciosamente para o tipo mais simples.
+    """
     if d <= 0:
         return 0.0
-    tipo = str(tipo).strip().lower()
-    if tipo == "usual":
+    tipo = normalizar_tipo(tipo)
+    q = max(float(q or 0.0), 0.0)
+    p = max(float(p or 0.0), 0.0)
+    s = max(float(s or 0.0), 0.0)
+
+    if tipo == "usual":                       # Tipo 1
         return 1.0
-    if tipo == "linear":  # V-shape com indiferença (tipo V de Brans)
-        if p is None or p <= 0:
-            return 1.0
+
+    if tipo == "u-shape":                     # Tipo 2
+        return 0.0 if d <= q else 1.0
+
+    if tipo == "v-shape":                     # Tipo 3
+        if p <= 0:
+            return 1.0                        # sem p, degrada para usual
+        return min(d / p, 1.0)
+
+    if tipo == "level":                       # Tipo 4
+        if p <= q:                            # parâmetros inconsistentes
+            return (0.0 if d <= q else 1.0) if q > 0 else 1.0
+        if d <= q:
+            return 0.0
+        if d <= p:
+            return 0.5
+        return 1.0
+
+    if tipo == "linear":                      # Tipo 5 (v-shape com indiferença)
+        if p <= 0:
+            return 1.0                        # sem p, degrada para usual
         if d <= q:
             return 0.0
         if d >= p:
             return 1.0
-        return (d - q) / (p - q) if p > q else 1.0
-    return 1.0  # fallback: usual
+        if p > q:
+            return (d - q) / (p - q)
+        return 1.0
+
+    if tipo == "gaussiana":                   # Tipo 6
+        if s <= 0:
+            return 1.0                        # sem s, degrada para usual
+        return 1.0 - math.exp(-(d ** 2) / (2.0 * s ** 2))
+
+    return 1.0  # fallback defensivo
 
 
 def promethee_ii(projetos, criterios, col_nome="Projeto"):
     """Calcula fluxos phi+, phi- e phi líquido (PROMETHEE II)."""
     nomes = projetos[col_nome].tolist()
     n = len(nomes)
-    pesos = criterios["Peso"].astype(float).values
-    pesos = pesos / pesos.sum()  # normaliza
+    soma_pesos = criterios["Peso"].astype(float).sum()
 
     pi = np.zeros((n, n))  # índice de preferência agregado pi(a,b)
-    for _, c in criterios.reset_index(drop=True).iterrows():
-        col = c["Criterio"]
+    for _, cr in criterios.reset_index(drop=True).iterrows():
+        col = cr["Criterio"]
         vals = projetos[col].astype(float).values
-        sinal = 1.0 if str(c["Objetivo"]).strip().lower().startswith("max") else -1.0
-        q = float(c.get("q_indiferenca", 0) or 0)
-        p = float(c.get("p_preferencia", 0) or 0)
-        w = float(c["Peso"]) / criterios["Peso"].astype(float).sum()
+        sinal = 1.0 if str(cr["Objetivo"]).strip().lower().startswith("max") else -1.0
+        q = float(cr.get("q_indiferenca", 0) or 0)
+        p = float(cr.get("p_preferencia", 0) or 0)
+        s = float(cr.get("s_gaussiana", 0) or 0)
+        w = float(cr["Peso"]) / soma_pesos
+        tipo = cr["FuncaoPreferencia"]
         for a in range(n):
             for b in range(n):
                 if a == b:
                     continue
                 d = sinal * (vals[a] - vals[b])
-                pi[a, b] += w * funcao_preferencia(d, c["FuncaoPreferencia"], q, p)
+                pi[a, b] += w * funcao_preferencia(d, tipo, q, p, s)
 
     phi_pos = pi.sum(axis=1) / (n - 1)
     phi_neg = pi.sum(axis=0) / (n - 1)
@@ -144,8 +222,8 @@ def promethee_v(ranking, projetos, orcamento, col_nome="Projeto"):
         melhor_val = 0.0
         for r in range(1, m + 1):
             for comb in combinations(idx, r):
-                c = custos[list(comb)].sum()
-                if c <= saldo:
+                cst = custos[list(comb)].sum()
+                if cst <= saldo:
                     v = phis[list(comb)].sum()
                     if v > melhor_val:
                         melhor_val, melhor_sel = v, list(comb)
@@ -192,14 +270,22 @@ def gerar_modelo_xlsx():
             "1) Aba 'Criterios': liste os critérios de decisão (derivados do seu planejamento estratégico / BSC).",
             "   - Peso: importância relativa (será normalizado automaticamente).",
             "   - Objetivo: 'max' (quanto maior, melhor) ou 'min' (quanto menor, melhor).",
-            "   - FuncaoPreferencia: 'usual' (qualquer diferença já é preferência total) ou 'linear' (preferência cresce entre q e p).",
-            "   - q_indiferenca: diferença até a qual os projetos são indiferentes (0 se não quiser usar).",
-            "   - p_preferencia: diferença a partir da qual a preferência é total (obrigatório se função = linear).",
+            "   - FuncaoPreferencia: um dos 6 tipos de Brans, Vincke & Mareschal (1986):",
+            "       * usual      (Tipo 1) — qualquer diferença gera preferência total. Sem parâmetros.",
+            "       * u-shape    (Tipo 2) — indiferente até q; preferência total acima de q. Usa: q_indiferenca.",
+            "       * v-shape    (Tipo 3) — preferência cresce linearmente de 0 a p. Usa: p_preferencia.",
+            "       * level      (Tipo 4) — 0 até q; 1/2 entre q e p; 1 acima de p. Usa: q_indiferenca e p_preferencia.",
+            "       * linear     (Tipo 5) — 0 até q; cresce linearmente entre q e p; 1 acima de p. Usa: q_indiferenca e p_preferencia.",
+            "       * gaussiana  (Tipo 6) — crescimento suave 1 - exp(-d²/2s²). Usa: s_gaussiana.",
+            "   - q_indiferenca: limiar de indiferença (tipos u-shape, level e linear; 0 nos demais).",
+            "   - p_preferencia: limiar de preferência total (tipos v-shape, level e linear; 0 nos demais).",
+            "   - s_gaussiana: ponto de inflexão s (apenas tipo gaussiana; 0 nos demais).",
+            "   - Parâmetro exigido deixado em 0 faz a função degradar para o tipo 'usual' (o app avisa).",
             "2) Aba 'Projetos': uma linha por projeto candidato.",
             "   - Custo: investimento requerido (mesma unidade do orçamento informado no app).",
             "   - Obrigatorio: 'sim' para projetos mandatórios (regulatórios, segurança) que entram antes da otimização.",
             "   - Demais colunas: desempenho do projeto em CADA critério — os nomes devem ser IDÊNTICOS aos da aba Criterios.",
-            "3) Salve e faça upload no app. Informe o orçamento e clique em Calcular.",
+            "3) Salve e faça upload no app. Informe o orçamento e navegue pelas abas de resultado.",
         ]}).to_excel(wr, sheet_name="Instrucoes", index=False)
     buf.seek(0)
     return buf
@@ -208,9 +294,10 @@ def gerar_modelo_xlsx():
 # ----------------------------------------------------------------------------
 # Interface
 # ----------------------------------------------------------------------------
-st.title("📊 Planejamento Estratégico Empresarial")
+st.title("📊 Do Plano à Carteira")
 st.caption("Seleção de portfólio de projetos alinhada ao planejamento estratégico — "
-           "método multicritério **PROMETHEE II + V**")
+           "método multicritério **PROMETHEE II + V**, com os 6 tipos de funções de "
+           "preferência de Brans, Vincke & Mareschal (1986)")
 
 with st.sidebar:
     st.header("⚙️ Entrada de dados")
@@ -228,6 +315,10 @@ with st.sidebar:
         "Orçamento total disponível", min_value=0.0, value=6000.0, step=100.0,
         help="Mesma unidade da coluna 'Custo' da planilha (ex.: R$ mil)."
     )
+    st.divider()
+    with st.expander("📖 As 6 funções de preferência"):
+        for nome in FUNCOES_VALIDAS:
+            st.markdown(f"**{nome}** — {DESCRICAO_FUNCOES[nome]}")
 
 # Carrega dados
 erro = None
@@ -250,22 +341,56 @@ projetos = projetos[~projetos["Projeto"].astype(str).str.upper().str.startswith(
 criterios = criterios.dropna(subset=["Criterio"]).reset_index(drop=True)
 projetos = projetos.reset_index(drop=True)
 
+# Compatibilidade: garante as colunas de parâmetros (planilhas da versão anterior)
+for col_param in ["q_indiferenca", "p_preferencia", "s_gaussiana"]:
+    if col_param not in criterios.columns:
+        criterios[col_param] = 0.0
+if "Obrigatorio" not in projetos.columns:
+    projetos["Obrigatorio"] = "não"
+
 # Validações básicas
-faltando = [c for c in criterios["Criterio"] if c not in projetos.columns]
+faltando = [x for x in criterios["Criterio"] if x not in projetos.columns]
 if faltando:
     st.error(f"Colunas de critério ausentes na aba Projetos: {faltando}. "
              "Os nomes devem ser idênticos aos da aba Criterios.")
     st.stop()
-if "Obrigatorio" not in projetos.columns:
-    projetos["Obrigatorio"] = "não"
+
+# Avisos de parametrização das funções de preferência
+avisos = []
+for _, cr in criterios.iterrows():
+    tipo = normalizar_tipo(cr["FuncaoPreferencia"])
+    q = float(cr.get("q_indiferenca", 0) or 0)
+    p = float(cr.get("p_preferencia", 0) or 0)
+    s = float(cr.get("s_gaussiana", 0) or 0)
+    nome = cr["Criterio"]
+    if tipo in ("v-shape", "linear") and p <= 0:
+        avisos.append(f"'{nome}': função '{tipo}' sem p_preferencia > 0 — tratada como 'usual'.")
+    if tipo == "level" and p <= q:
+        avisos.append(f"'{nome}': função 'level' exige p_preferencia > q_indiferenca — tratada como degrau simples.")
+    if tipo == "linear" and 0 < p <= q:
+        avisos.append(f"'{nome}': função 'linear' com p ≤ q — tratada como 'u-shape'.")
+    if tipo == "gaussiana" and s <= 0:
+        avisos.append(f"'{nome}': função 'gaussiana' sem s_gaussiana > 0 — tratada como 'usual'.")
+for a in avisos:
+    st.warning(a)
 
 tab1, tab2, tab3 = st.tabs(["1️⃣ Dados & Pesos", "2️⃣ Ranking (PROMETHEE II)",
                             "3️⃣ Carteira Ótima (PROMETHEE V)"])
 
 with tab1:
-    st.subheader("Critérios de decisão (edite os pesos, se quiser)")
-    criterios = st.data_editor(criterios, num_rows="fixed", use_container_width=True,
-                               key="edit_criterios")
+    st.subheader("Critérios de decisão (edite pesos, funções e parâmetros)")
+    st.caption("FuncaoPreferencia aceita: " + ", ".join(FUNCOES_VALIDAS) +
+               ". Parâmetros: q_indiferenca (u-shape, level, linear), "
+               "p_preferencia (v-shape, level, linear), s_gaussiana (gaussiana).")
+    criterios = st.data_editor(
+        criterios, num_rows="fixed", use_container_width=True, key="edit_criterios",
+        column_config={
+            "FuncaoPreferencia": st.column_config.SelectboxColumn(
+                "FuncaoPreferencia", options=FUNCOES_VALIDAS, required=True,
+                help="Um dos 6 tipos de Brans, Vincke & Mareschal (1986)."
+            ),
+        },
+    )
     soma = criterios["Peso"].astype(float).sum()
     st.info(f"Soma dos pesos = **{soma:.2f}** (será normalizada para 1,00 no cálculo).")
     st.subheader("Projetos candidatos")
@@ -278,7 +403,7 @@ ranking = promethee_ii(projetos, criterios)
 with tab2:
     st.subheader("Ranking dos projetos — fluxo líquido de preferência (φ)")
     st.caption("φ = 'placar' de cada projeto nas comparações par a par, ponderado pelos "
-               "pesos dos critérios. φ > 0: mais forças que fraquezas.")
+               "pesos dos critérios e pelas funções de preferência. φ > 0: mais forças que fraquezas.")
     st.dataframe(ranking, use_container_width=True, hide_index=True)
     graf = ranking.set_index("Projeto")[["phi líquido"]]
     st.bar_chart(graf)
@@ -319,12 +444,14 @@ with tab3:
         with pd.ExcelWriter(buf, engine="openpyxl") as wr:
             ranking.to_excel(wr, sheet_name="Ranking_PROMETHEE_II", index=False)
             carteira.to_excel(wr, sheet_name="Carteira_PROMETHEE_V", index=False)
+            criterios.to_excel(wr, sheet_name="Criterios_Utilizados", index=False)
         buf.seek(0)
         st.download_button("⬇️ Exportar resultados (.xlsx)", data=buf,
                            file_name="resultado_portfolio_mcda.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 st.divider()
-st.caption("Método: Brans & Mareschal (PROMETHEE II/V). Ferramenta de apoio à decisão — "
-           "os pesos e julgamentos são responsabilidade dos decisores. "
-           "Produto Tecnológico - Eliezer Guimarães Miranda (contato: eliezer.guimaraes.miranda@gmail.com)")
+st.caption("Método: Brans & Vincke (1985); Brans, Vincke & Mareschal (1986) — PROMETHEE II/V, "
+           "com os 6 critérios generalizados. Ferramenta de apoio à decisão — os pesos, funções "
+           "e julgamentos são responsabilidade dos decisores. "
+           "Artigo tecnológico associado: 'Do Plano à Carteira' (FUCAPE Business School).")
