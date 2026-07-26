@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Do Plano à Carteira — Seleção de Portfólio de Projetos com MCDA (PROMETHEE II + V)
+Planejamento Estratégico Empresarial - Seleção de Portfólio de Projetos com MCDA (PROMETHEE II + V)
 App Streamlit para apoiar a decisão de portfólio de investimentos alinhada
 ao planejamento estratégico empresarial.
 
@@ -32,7 +32,7 @@ import streamlit as st
 # Configuração da página
 # ----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Do Plano à Carteira — MCDA PROMETHEE V",
+    page_title="Planejamento Estratégico Empresarial — Seleção de Portfólio de Projetos de Investimento com MCDA PROMETHEE V",
     page_icon="📊",
     layout="wide",
 )
@@ -321,7 +321,7 @@ def gerar_modelo_xlsx():
 # ----------------------------------------------------------------------------
 # Interface
 # ----------------------------------------------------------------------------
-st.title("📊 Do Plano à Carteira")
+st.title("📊 Planejamento Estratégico Empresarial")
 st.caption("Seleção de portfólio de projetos alinhada ao planejamento estratégico — "
            "método multicritério **PROMETHEE II + V**, com os 6 tipos de funções de "
            "preferência de Brans, Vincke & Mareschal (1986)")
@@ -491,4 +491,6 @@ st.divider()
 st.caption("Método: Brans & Vincke (1985); Brans, Vincke & Mareschal (1986) — PROMETHEE II/V, "
            "com os 6 critérios generalizados. Ferramenta de apoio à decisão — os pesos, funções "
            "e julgamentos são responsabilidade dos decisores. "
-           "Artigo tecnológico associado: 'Do Plano à Carteira' (FUCAPE Business School).")
+           "Produto Tecnológico."
+           "Contato: Eliezer Guimarães Miranda"
+           "E-mail:   eliezer.guimaraes.miranda@gmail.com")
