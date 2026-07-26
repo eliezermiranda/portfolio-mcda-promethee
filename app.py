@@ -327,4 +327,4 @@ with tab3:
 st.divider()
 st.caption("Método: Brans & Mareschal (PROMETHEE II/V). Ferramenta de apoio à decisão — "
            "os pesos e julgamentos são responsabilidade dos decisores. "
-           "Artigo tecnológico associado: 'Do Plano à Carteira' (FUCAPE Business School).")
+           "Produto Tecnológico - Eliezer Guimarães Miranda (contato: eliezer.guimaraes.miranda@gmail.com)")
