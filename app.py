@@ -4,15 +4,15 @@ Do Plano à Carteira — Seleção de Portfólio de Projetos com MCDA (PROMETHEE
 App Streamlit para apoiar a decisão de portfólio de investimentos alinhada
 ao planejamento estratégico empresarial.
 
-Versão 2 — implementa os SEIS tipos de funções de preferência generalizadas
-de Brans, Vincke e Mareschal (1986):
-  Tipo 1 — usual        : P = 1 se d > 0                        (sem parâmetros)
-  Tipo 2 — u-shape      : P = 1 se d > q                        (parâmetro q)
-  Tipo 3 — v-shape      : P = d/p em (0, p], 1 acima            (parâmetro p)
-  Tipo 4 — level        : P = 1/2 em (q, p], 1 acima            (parâmetros q, p)
-  Tipo 5 — linear       : P = (d-q)/(p-q) em (q, p], 1 acima    (parâmetros q, p)
-                          (v-shape com indiferença)
-  Tipo 6 — gaussiana    : P = 1 - exp(-d²/(2s²)) se d > 0       (parâmetro s)
+Versão 3 — os SEIS tipos de funções de preferência generalizadas de
+Brans, Vincke e Mareschal (1986), com a nomenclatura:
+
+  Tipo 1 - Critério Usual                                        (Usual criterion)          sem parâmetros
+  Tipo 2 - Quasi-Critério (U-Shape)                              (Quasi criterion)          parâmetro q
+  Tipo 3 - Critério Linear (V-Shape)                             (Linear criterion)         parâmetro p
+  Tipo 4 - Critério de Nível                                     (Level criterion)          parâmetros q, p
+  Tipo 5 - Critério Linear com Indiferença (V-Shape w/ Indif.)   (Linear with indifference) parâmetros q, p
+  Tipo 6 - Critério Gaussiano                                    (Gaussian criterion)       parâmetro s
 
 Como funciona o app:
 1) PROMETHEE II ordena os projetos (fluxo líquido de preferência, phi)
@@ -37,15 +37,23 @@ st.set_page_config(
     layout="wide",
 )
 
-FUNCOES_VALIDAS = ["usual", "u-shape", "v-shape", "level", "linear", "gaussiana"]
+# Rótulos oficiais (aparecem no dropdown, na planilha e nos resultados)
+T1 = "Tipo 1 - Critério Usual"
+T2 = "Tipo 2 - Quasi-Critério (U-Shape)"
+T3 = "Tipo 3 - Critério Linear (V-Shape)"
+T4 = "Tipo 4 - Critério de Nível"
+T5 = "Tipo 5 - Critério Linear com Indiferença (V-Shape with Indifference)"
+T6 = "Tipo 6 - Critério Gaussiano"
+
+FUNCOES_VALIDAS = [T1, T2, T3, T4, T5, T6]
 
 DESCRICAO_FUNCOES = {
-    "usual":     "Tipo 1 — Usual: qualquer diferença positiva gera preferência total (P = 1). Sem parâmetros. Indicada para escalas discretas (ex.: notas 1–5) em que qualquer diferença conta.",
-    "u-shape":   "Tipo 2 — U-shape (quase-critério): diferenças até q são indiferentes (P = 0); acima de q, preferência total (P = 1). Parâmetro: q.",
-    "v-shape":   "Tipo 3 — V-shape: a preferência cresce linearmente de 0 até p (P = d/p) e é total acima de p. Parâmetro: p. Sem faixa de indiferença.",
-    "level":     "Tipo 4 — Level (patamar): P = 0 até q; P = 1/2 entre q e p; P = 1 acima de p. Parâmetros: q e p. Útil para julgamentos em degraus (indiferente / preferência fraca / preferência forte).",
-    "linear":    "Tipo 5 — Linear (V-shape com indiferença): P = 0 até q; cresce linearmente (P = (d−q)/(p−q)) entre q e p; P = 1 acima de p. Parâmetros: q e p. A mais usada para critérios contínuos (ex.: VPL).",
-    "gaussiana": "Tipo 6 — Gaussiana: P = 1 − exp(−d²/2s²) para d > 0 — crescimento suave, sem descontinuidades. Parâmetro: s (ponto de inflexão, informado na coluna s_gaussiana).",
+    T1: "Usual criterion — qualquer diferença positiva gera preferência total (P = 1). Sem parâmetros. Indicado para escalas discretas (ex.: notas 1–5) em que qualquer diferença conta.",
+    T2: "Quasi criterion — diferenças até q são indiferentes (P = 0); acima de q, preferência total (P = 1). Parâmetro: q_indiferenca.",
+    T3: "Linear criterion — a preferência cresce linearmente de 0 até p (P = d/p) e é total acima de p. Parâmetro: p_preferencia. Sem faixa de indiferença.",
+    T4: "Level criterion — P = 0 até q; P = 1/2 entre q e p; P = 1 acima de p. Parâmetros: q_indiferenca e p_preferencia (p > q). Útil para julgamentos em degraus (indiferente / preferência fraca / preferência forte).",
+    T5: "Linear with indifference — P = 0 até q; cresce linearmente (P = (d−q)/(p−q)) entre q e p; P = 1 acima de p. Parâmetros: q_indiferenca e p_preferencia. O mais usado para critérios contínuos (ex.: VPL).",
+    T6: "Gaussian criterion — P = 1 − exp(−d²/2s²) para d > 0: crescimento suave, sem descontinuidades. Parâmetro: s_gaussiana (ponto de inflexão).",
 }
 
 # ----------------------------------------------------------------------------
@@ -57,7 +65,7 @@ def dados_exemplo():
                      "Risco de Execução (1-5)", "Impacto ESG (1-5)"],
         "Peso": [0.35, 0.30, 0.20, 0.15],
         "Objetivo": ["max", "max", "min", "max"],
-        "FuncaoPreferencia": ["linear", "linear", "usual", "linear"],
+        "FuncaoPreferencia": [T5, T3, T1, T3],
         "q_indiferenca": [50.0, 0.0, 0.0, 0.0],
         "p_preferencia": [500.0, 2.0, 0.0, 2.0],
         "s_gaussiana": [0.0, 0.0, 0.0, 0.0],
@@ -81,22 +89,40 @@ def dados_exemplo():
 # (Brans, Vincke & Mareschal, 1986)
 # ----------------------------------------------------------------------------
 def normalizar_tipo(tipo):
-    """Aceita sinônimos/variações de escrita e devolve o nome canônico."""
-    t = str(tipo).strip().lower().replace("_", "-").replace(" ", "-")
-    mapa = {
-        "usual": "usual", "tipo1": "usual", "type1": "usual", "1": "usual",
-        "u-shape": "u-shape", "ushape": "u-shape", "quase-criterio": "u-shape",
-        "quase-critério": "u-shape", "tipo2": "u-shape", "type2": "u-shape", "2": "u-shape",
-        "v-shape": "v-shape", "vshape": "v-shape", "linear-simples": "v-shape",
-        "tipo3": "v-shape", "type3": "v-shape", "3": "v-shape",
-        "level": "level", "patamar": "level", "niveis": "level", "níveis": "level",
-        "tipo4": "level", "type4": "level", "4": "level",
-        "linear": "linear", "v-shape-indiferenca": "linear", "v-shape-indiferença": "linear",
-        "linear-com-indiferenca": "linear", "tipo5": "linear", "type5": "linear", "5": "linear",
-        "gaussiana": "gaussiana", "gaussian": "gaussiana", "gauss": "gaussiana",
-        "tipo6": "gaussiana", "type6": "gaussiana", "6": "gaussiana",
-    }
-    return mapa.get(t, "usual")
+    """
+    Converte o rótulo da função (nomenclatura oficial, sinônimos em PT/EN
+    ou os nomes curtos das versões anteriores do app) na chave interna t1..t6.
+    """
+    t = str(tipo).strip().lower()
+    t = (t.replace("_", "-").replace("í", "i").replace("é", "e")
+           .replace("ç", "c").replace("ã", "a"))
+    compacto = t.replace(" ", "").replace("-", "")
+
+    # 1) Prefixo "Tipo N" tem prioridade máxima (nomenclatura oficial)
+    for n, chave in [("1", "t1"), ("2", "t2"), ("3", "t3"),
+                     ("4", "t4"), ("5", "t5"), ("6", "t6")]:
+        if compacto.startswith(f"tipo{n}") or compacto == n:
+            return chave
+
+    # 2) Palavras-chave (sinônimos PT/EN e nomes curtos das versões anteriores)
+    if "indif" in compacto:                      # linear com indiferença
+        return "t5"
+    if "gauss" in compacto:
+        return "t6"
+    if "quasi" in compacto or "quase" in compacto or "ushape" in compacto:
+        return "t2"
+    if "nivel" in compacto or "level" in compacto or "patamar" in compacto:
+        return "t4"
+    if "vshape" in compacto:                     # v-shape sem 'indif' = Tipo 3
+        return "t3"
+    if "linear" in compacto:
+        # Compatibilidade: nas versões anteriores, "linear" era o Tipo 5
+        # (com q e p). Como o Tipo 5 com q=0 é matematicamente idêntico ao
+        # Tipo 3, mapear para t5 preserva os dois comportamentos.
+        return "t5"
+    if "usual" in compacto:
+        return "t1"
+    return "t1"  # fallback defensivo
 
 
 def funcao_preferencia(d, tipo, q=0.0, p=0.0, s=0.0):
@@ -107,24 +133,24 @@ def funcao_preferencia(d, tipo, q=0.0, p=0.0, s=0.0):
     """
     if d <= 0:
         return 0.0
-    tipo = normalizar_tipo(tipo)
+    chave = normalizar_tipo(tipo)
     q = max(float(q or 0.0), 0.0)
     p = max(float(p or 0.0), 0.0)
     s = max(float(s or 0.0), 0.0)
 
-    if tipo == "usual":                       # Tipo 1
+    if chave == "t1":                          # Tipo 1 — Critério Usual
         return 1.0
 
-    if tipo == "u-shape":                     # Tipo 2
+    if chave == "t2":                          # Tipo 2 — Quasi-Critério (U-Shape)
         return 0.0 if d <= q else 1.0
 
-    if tipo == "v-shape":                     # Tipo 3
+    if chave == "t3":                          # Tipo 3 — Critério Linear (V-Shape)
         if p <= 0:
-            return 1.0                        # sem p, degrada para usual
+            return 1.0                         # sem p, degrada para usual
         return min(d / p, 1.0)
 
-    if tipo == "level":                       # Tipo 4
-        if p <= q:                            # parâmetros inconsistentes
+    if chave == "t4":                          # Tipo 4 — Critério de Nível
+        if p <= q:                             # parâmetros inconsistentes
             return (0.0 if d <= q else 1.0) if q > 0 else 1.0
         if d <= q:
             return 0.0
@@ -132,9 +158,9 @@ def funcao_preferencia(d, tipo, q=0.0, p=0.0, s=0.0):
             return 0.5
         return 1.0
 
-    if tipo == "linear":                      # Tipo 5 (v-shape com indiferença)
+    if chave == "t5":                          # Tipo 5 — Linear com Indiferença
         if p <= 0:
-            return 1.0                        # sem p, degrada para usual
+            return 1.0                         # sem p, degrada para usual
         if d <= q:
             return 0.0
         if d >= p:
@@ -143,9 +169,9 @@ def funcao_preferencia(d, tipo, q=0.0, p=0.0, s=0.0):
             return (d - q) / (p - q)
         return 1.0
 
-    if tipo == "gaussiana":                   # Tipo 6
+    if chave == "t6":                          # Tipo 6 — Critério Gaussiano
         if s <= 0:
-            return 1.0                        # sem s, degrada para usual
+            return 1.0                         # sem s, degrada para usual
         return 1.0 - math.exp(-(d ** 2) / (2.0 * s ** 2))
 
     return 1.0  # fallback defensivo
@@ -271,16 +297,17 @@ def gerar_modelo_xlsx():
             "   - Peso: importância relativa (será normalizado automaticamente).",
             "   - Objetivo: 'max' (quanto maior, melhor) ou 'min' (quanto menor, melhor).",
             "   - FuncaoPreferencia: um dos 6 tipos de Brans, Vincke & Mareschal (1986):",
-            "       * usual      (Tipo 1) — qualquer diferença gera preferência total. Sem parâmetros.",
-            "       * u-shape    (Tipo 2) — indiferente até q; preferência total acima de q. Usa: q_indiferenca.",
-            "       * v-shape    (Tipo 3) — preferência cresce linearmente de 0 a p. Usa: p_preferencia.",
-            "       * level      (Tipo 4) — 0 até q; 1/2 entre q e p; 1 acima de p. Usa: q_indiferenca e p_preferencia.",
-            "       * linear     (Tipo 5) — 0 até q; cresce linearmente entre q e p; 1 acima de p. Usa: q_indiferenca e p_preferencia.",
-            "       * gaussiana  (Tipo 6) — crescimento suave 1 - exp(-d²/2s²). Usa: s_gaussiana.",
-            "   - q_indiferenca: limiar de indiferença (tipos u-shape, level e linear; 0 nos demais).",
-            "   - p_preferencia: limiar de preferência total (tipos v-shape, level e linear; 0 nos demais).",
-            "   - s_gaussiana: ponto de inflexão s (apenas tipo gaussiana; 0 nos demais).",
-            "   - Parâmetro exigido deixado em 0 faz a função degradar para o tipo 'usual' (o app avisa).",
+            f"       * {T1} (Usual criterion) — qualquer diferença gera preferência total. Sem parâmetros.",
+            f"       * {T2} (Quasi criterion) — indiferente até q; preferência total acima de q. Usa: q_indiferenca.",
+            f"       * {T3} (Linear criterion) — preferência cresce linearmente de 0 até p (P = d/p). Usa: p_preferencia.",
+            f"       * {T4} (Level criterion) — 0 até q; 1/2 entre q e p; 1 acima de p. Usa: q_indiferenca e p_preferencia (p > q).",
+            f"       * {T5} (Linear with indifference) — 0 até q; cresce linearmente entre q e p; 1 acima de p. Usa: q e p.",
+            f"       * {T6} (Gaussian criterion) — crescimento suave P = 1 - exp(-d²/2s²). Usa: s_gaussiana.",
+            "   - q_indiferenca: limiar de indiferença (Tipos 2, 4 e 5; deixe 0 nos demais).",
+            "   - p_preferencia: limiar de preferência total (Tipos 3, 4 e 5; deixe 0 nos demais).",
+            "   - s_gaussiana: ponto de inflexão s (apenas Tipo 6; deixe 0 nos demais).",
+            "   - Pode-se escrever apenas 'Tipo 1' ... 'Tipo 6' — o app reconhece. Parâmetro exigido deixado em 0",
+            "     faz a função degradar para o Critério Usual (o app avisa).",
             "2) Aba 'Projetos': uma linha por projeto candidato.",
             "   - Custo: investimento requerido (mesma unidade do orçamento informado no app).",
             "   - Obrigatorio: 'sim' para projetos mandatórios (regulatórios, segurança) que entram antes da otimização.",
@@ -318,7 +345,7 @@ with st.sidebar:
     st.divider()
     with st.expander("📖 As 6 funções de preferência"):
         for nome in FUNCOES_VALIDAS:
-            st.markdown(f"**{nome}** — {DESCRICAO_FUNCOES[nome]}")
+            st.markdown(f"**{nome}**  \n{DESCRICAO_FUNCOES[nome]}")
 
 # Carrega dados
 erro = None
@@ -341,12 +368,19 @@ projetos = projetos[~projetos["Projeto"].astype(str).str.upper().str.startswith(
 criterios = criterios.dropna(subset=["Criterio"]).reset_index(drop=True)
 projetos = projetos.reset_index(drop=True)
 
-# Compatibilidade: garante as colunas de parâmetros (planilhas da versão anterior)
+# Compatibilidade: garante as colunas de parâmetros (planilhas de versões anteriores)
 for col_param in ["q_indiferenca", "p_preferencia", "s_gaussiana"]:
     if col_param not in criterios.columns:
         criterios[col_param] = 0.0
 if "Obrigatorio" not in projetos.columns:
     projetos["Obrigatorio"] = "não"
+
+# Normaliza os rótulos das funções para a nomenclatura oficial
+# (aceita 'Tipo N', nomes antigos 'usual'/'linear'/'v-shape' etc. e sinônimos EN)
+ROTULO_POR_CHAVE = {"t1": T1, "t2": T2, "t3": T3, "t4": T4, "t5": T5, "t6": T6}
+criterios["FuncaoPreferencia"] = criterios["FuncaoPreferencia"].apply(
+    lambda v: ROTULO_POR_CHAVE[normalizar_tipo(v)]
+)
 
 # Validações básicas
 faltando = [x for x in criterios["Criterio"] if x not in projetos.columns]
@@ -358,19 +392,21 @@ if faltando:
 # Avisos de parametrização das funções de preferência
 avisos = []
 for _, cr in criterios.iterrows():
-    tipo = normalizar_tipo(cr["FuncaoPreferencia"])
+    chave = normalizar_tipo(cr["FuncaoPreferencia"])
     q = float(cr.get("q_indiferenca", 0) or 0)
     p = float(cr.get("p_preferencia", 0) or 0)
     s = float(cr.get("s_gaussiana", 0) or 0)
     nome = cr["Criterio"]
-    if tipo in ("v-shape", "linear") and p <= 0:
-        avisos.append(f"'{nome}': função '{tipo}' sem p_preferencia > 0 — tratada como 'usual'.")
-    if tipo == "level" and p <= q:
-        avisos.append(f"'{nome}': função 'level' exige p_preferencia > q_indiferenca — tratada como degrau simples.")
-    if tipo == "linear" and 0 < p <= q:
-        avisos.append(f"'{nome}': função 'linear' com p ≤ q — tratada como 'u-shape'.")
-    if tipo == "gaussiana" and s <= 0:
-        avisos.append(f"'{nome}': função 'gaussiana' sem s_gaussiana > 0 — tratada como 'usual'.")
+    if chave == "t2" and q <= 0:
+        avisos.append(f"'{nome}': Tipo 2 (Quasi-Critério) sem q_indiferenca > 0 — comporta-se como o Tipo 1 (Usual).")
+    if chave in ("t3", "t5") and p <= 0:
+        avisos.append(f"'{nome}': {ROTULO_POR_CHAVE[chave]} sem p_preferencia > 0 — tratado como Tipo 1 (Usual).")
+    if chave == "t4" and p <= q:
+        avisos.append(f"'{nome}': Tipo 4 (Nível) exige p_preferencia > q_indiferenca — tratado como degrau simples.")
+    if chave == "t5" and 0 < p <= q:
+        avisos.append(f"'{nome}': Tipo 5 com p ≤ q — tratado como Tipo 2 (Quasi-Critério).")
+    if chave == "t6" and s <= 0:
+        avisos.append(f"'{nome}': Tipo 6 (Gaussiano) sem s_gaussiana > 0 — tratado como Tipo 1 (Usual).")
 for a in avisos:
     st.warning(a)
 
@@ -379,14 +415,15 @@ tab1, tab2, tab3 = st.tabs(["1️⃣ Dados & Pesos", "2️⃣ Ranking (PROMETHEE
 
 with tab1:
     st.subheader("Critérios de decisão (edite pesos, funções e parâmetros)")
-    st.caption("FuncaoPreferencia aceita: " + ", ".join(FUNCOES_VALIDAS) +
-               ". Parâmetros: q_indiferenca (u-shape, level, linear), "
-               "p_preferencia (v-shape, level, linear), s_gaussiana (gaussiana).")
+    st.caption("Parâmetros por tipo: q_indiferenca (Tipos 2, 4 e 5) • "
+               "p_preferencia (Tipos 3, 4 e 5) • s_gaussiana (Tipo 6). "
+               "O Tipo 1 não usa parâmetros.")
     criterios = st.data_editor(
         criterios, num_rows="fixed", use_container_width=True, key="edit_criterios",
         column_config={
             "FuncaoPreferencia": st.column_config.SelectboxColumn(
                 "FuncaoPreferencia", options=FUNCOES_VALIDAS, required=True,
+                width="large",
                 help="Um dos 6 tipos de Brans, Vincke & Mareschal (1986)."
             ),
         },
