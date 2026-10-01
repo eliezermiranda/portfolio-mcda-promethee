@@ -61,25 +61,25 @@ DESCRICAO_FUNCOES = {
 # ----------------------------------------------------------------------------
 def dados_exemplo():
     criterios = pd.DataFrame({
-        "Criterio": ["VPL (R$ mil)", "Alinhamento Estratégico (1-5)",
-                     "Risco de Execução (1-5)", "Impacto ESG (1-5)"],
-        "Peso": [0.35, 0.30, 0.20, 0.15],
+        "Criterio": ["Financeiro - VPL (R$ mil)", "Alinhamento (1-10)",
+                     "Risco de Execução (1-10)", "Impacto ESG (1-10)"],
+        "Peso": [0.3, 0.25, 0.25, 0.2],
         "Objetivo": ["max", "max", "min", "max"],
         "FuncaoPreferencia": [T5, T3, T1, T3],
-        "q_indiferenca": [50.0, 0.0, 0.0, 0.0],
-        "p_preferencia": [500.0, 2.0, 0.0, 2.0],
+        "q_indiferenca": [100.0, 0.0, 0.0, 0.0],
+        "p_preferencia": [1000.0, 4.0, 0.0, 4.0],
         "s_gaussiana": [0.0, 0.0, 0.0, 0.0],
     })
     projetos = pd.DataFrame({
-        "Projeto": ["ERP Cloud", "Nova Linha de Produção", "Expansão Nordeste",
-                    "Programa ESG", "Automação Logística", "CRM Comercial",
-                    "Eficiência Energética", "Data Analytics"],
-        "Custo": [1200, 3500, 2800, 800, 1500, 600, 900, 700],
+        "Projeto": ["Projeto 01", "Projeto 02", "Projeto 03",
+                    "Projeto 04", "Projeto 05", "Projeto 06",
+                    "Projeto 07", "Projeto 08"],
+        "Custo": [2400, 7000, 5600, 1600, 3000, 1200, 1800, 1400],
         "Obrigatorio": ["não", "não", "não", "sim", "não", "não", "não", "não"],
-        "VPL (R$ mil)": [900, 2200, 1800, 150, 1100, 450, 600, 500],
-        "Alinhamento Estratégico (1-5)": [4, 5, 4, 3, 3, 2, 3, 4],
-        "Risco de Execução (1-5)": [3, 4, 4, 1, 2, 1, 2, 2],
-        "Impacto ESG (1-5)": [2, 2, 3, 5, 3, 1, 5, 2],
+        "Financeiro - VPL (R$ mil)": [1800, 4400, 3600, 300, 2200, 900, 1200, 1000],
+        "Alinhamento (1-10)": [8, 10, 8, 6, 6, 4, 6, 8],
+        "Risco (1-10)": [6, 8, 8, 2, 4, 2, 4, 4],
+        "Sustentabilidade (1-10)": [4, 4, 6, 10, 6, 2, 10, 4],
     })
     return criterios, projetos
 
@@ -303,8 +303,8 @@ def gerar_modelo_xlsx():
             f"       * {T4} (Level criterion) — 0 até q; 1/2 entre q e p; 1 acima de p. Usa: q_indiferenca e p_preferencia (p > q).",
             f"       * {T5} (Linear with indifference) — 0 até q; cresce linearmente entre q e p; 1 acima de p. Usa: q e p.",
             f"       * {T6} (Gaussian criterion) — crescimento suave P = 1 - exp(-d²/2s²). Usa: s_gaussiana.",
-            "   - q_indiferenca: limiar de indiferença (Tipos 2, 4 e 5; deixe 0 nos demais).",
-            "   - p_preferencia: limiar de preferência total (Tipos 3, 4 e 5; deixe 0 nos demais).",
+            "   - q_indiferenca: limiar de indiferença (Tipos 4, 8 e 10; deixe 0 nos demais).",
+            "   - p_preferencia: limiar de preferência total (Tipos 6, 8 e 10; deixe 0 nos demais).",
             "   - s_gaussiana: ponto de inflexão s (apenas Tipo 6; deixe 0 nos demais).",
             "   - Pode-se escrever apenas 'Tipo 1' ... 'Tipo 6' — o app reconhece. Parâmetro exigido deixado em 0",
             "     faz a função degradar para o Critério Usual (o app avisa).",
@@ -491,6 +491,4 @@ st.divider()
 st.caption("Método: Brans & Vincke (1985); Brans, Vincke & Mareschal (1986) — PROMETHEE II/V, "
            "com os 6 critérios generalizados. Ferramenta de apoio à decisão — os pesos, funções "
            "e julgamentos são responsabilidade dos decisores. "
-           "Produto Tecnológico."
-           "Contato: Eliezer Guimarães Miranda"
-           "E-mail:   eliezer.guimaraes.miranda@gmail.com")
+           "Produto Tecnológico.")
