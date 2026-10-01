@@ -48,7 +48,7 @@ T6 = "Tipo 6 - Critério Gaussiano"
 FUNCOES_VALIDAS = [T1, T2, T3, T4, T5, T6]
 
 DESCRICAO_FUNCOES = {
-    T1: "Usual criterion — qualquer diferença positiva gera preferência total (P = 1). Sem parâmetros. Indicado para escalas discretas (ex.: notas 1–5) em que qualquer diferença conta.",
+    T1: "Usual criterion — qualquer diferença positiva gera preferência total (P = 1). Sem parâmetros. Indicado para escalas discretas (ex.: notas 1–10) em que qualquer diferença conta.",
     T2: "Quasi criterion — diferenças até q são indiferentes (P = 0); acima de q, preferência total (P = 1). Parâmetro: q_indiferenca.",
     T3: "Linear criterion — a preferência cresce linearmente de 0 até p (P = d/p) e é total acima de p. Parâmetro: p_preferencia. Sem faixa de indiferença.",
     T4: "Level criterion — P = 0 até q; P = 1/2 entre q e p; P = 1 acima de p. Parâmetros: q_indiferenca e p_preferencia (p > q). Útil para julgamentos em degraus (indiferente / preferência fraca / preferência forte).",
@@ -62,7 +62,7 @@ DESCRICAO_FUNCOES = {
 def dados_exemplo():
     criterios = pd.DataFrame({
         "Criterio": ["Financeiro - VPL (R$ mil)", "Alinhamento (1-10)",
-                     "Risco de Execução (1-10)", "Impacto ESG (1-10)"],
+                     "Risco (1-10)", "Sustentabilidade (1-10)"],
         "Peso": [0.3, 0.25, 0.25, 0.2],
         "Objetivo": ["max", "max", "min", "max"],
         "FuncaoPreferencia": [T5, T3, T1, T3],
