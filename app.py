@@ -339,7 +339,7 @@ with st.sidebar:
     st.divider()
     st.header("💰 Restrição")
     orcamento = st.number_input(
-        "Orçamento total disponível", min_value=0.0, value=6000.0, step=100.0,
+        "Orçamento total disponível", min_value=0.0, value=12000.0, step=100.0,
         help="Mesma unidade da coluna 'Custo' da planilha (ex.: R$ mil)."
     )
     st.divider()
